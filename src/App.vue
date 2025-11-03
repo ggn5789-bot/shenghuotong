@@ -5,9 +5,11 @@
   </div>
 </template>
 
+
 <script>
 // 引入 POI 搜索组件
 import PoiSearch from './components/PoiSearch.vue';
+import axios from 'axios';
 
 export default {
   name: 'App',
@@ -74,3 +76,4 @@ export default {
   margin-top: 60px;
 }
 </style>
+<
