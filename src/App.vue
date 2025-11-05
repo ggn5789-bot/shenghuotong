@@ -18,7 +18,8 @@ export default {
   },
   data() {
     return {
-      map: null
+      map: null,
+       markers: [] 
     };
   },
   mounted() {
@@ -47,21 +48,45 @@ export default {
       }
     },
     // 处理 POI 搜索结果
-    searchPOI(query) {
-      const userLocation = this.map.getCenter(); // 获取当前地图中心的经纬度
-      const url = `https://restapi.amap.com/v3/place/around?location=${userLocation.lng},${userLocation.lat}&keywords=${query}&key=YOUR_GAODE_API_KEY`;
+    async searchPOI(query) {
+  try {
+    // 1) 获取当前地图中心经纬度
+    const c = this.map.getCenter(); 
 
-      axios.get(url).then(response => {
-        const pois = response.data.pois;
-        pois.forEach(poi => {
-          new AMap.Marker({
-            position: [poi.location.lng, poi.location.lat],
-            title: poi.name,
-            map: this.map,
-          });
-        });
-      });
+    // 2) 清理上一次搜索产生的标记
+    if (this.markers.length) {
+      this.markers.forEach(m => m.setMap(null));
+      this.markers = [];
     }
+
+    // 3) 调用在 Vercel 上的 Serverless 接口
+    const { data } = await axios.get('/api/search', {
+      params: { query, longitude: c.lng, latitude: c.lat }
+    });
+
+    // 4) 渲染返回的 POI
+    const pois = data?.pois || [];
+    pois.forEach(poi => {
+      const [lng, lat] = (poi.location || '').split(',').map(Number);
+      if (!isNaN(lng) && !isNaN(lat)) {
+        const marker = new AMap.Marker({
+          position: [lng, lat],
+          title: poi.name,
+          map: this.map
+        });
+        this.markers.push(marker);
+      }
+    });
+
+    // 5) 自动缩放到合适视野
+    if (this.markers.length) {
+      this.map.setFitView(this.markers);
+    }
+  } catch (err) {
+    console.error(err);
+    alert('搜索失败，请稍后重试');
+       }
+     }
   }
 };
 </script>
