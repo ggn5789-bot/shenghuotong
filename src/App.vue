@@ -3,47 +3,48 @@
     <!-- 顶部搜索栏 -->
     <header class="header">
       <h1>生活通 · 附近生活服务查询</h1>
+
       <div class="search-bar">
         <input
           v-model.trim="keyword"
           type="text"
-          placeholder="请输入搜索关键字"
+          placeholder="搜索附近商店或服务，如：超市、餐饮、医院..."
           @keyup.enter="handleSearch"
         />
         <button @click="handleSearch" :disabled="loading">
           {{ loading ? '搜索中...' : '搜索' }}
         </button>
       </div>
+
+      <!-- 分类快捷按钮 -->
+      <div class="categories">
+        <button
+          v-for="c in categories"
+          :key="c.value"
+          :class="{ active: c.value === activeCategory }"
+          @click="setCategory(c.value)"
+        >
+          {{ c.label }}
+        </button>
+      </div>
+
+      <!-- 搜索历史 -->
+      <div v-if="history.length" class="history">
+        <span class="history-label">历史记录：</span>
+        <button
+          v-for="h in history"
+          :key="h"
+          class="history-item"
+          @click="selectHistory(h)"
+        >
+          {{ h }}
+        </button>
+        <button class="history-clear" @click="clearHistory">清空</button>
+      </div>
+
+      <!-- 错误提示 -->
+      <p v-if="errorMsg" class="error">{{ errorMsg }}</p>
     </header>
-
-    <!-- 分类快捷按钮 -->
-    <div class="categories">
-      <button
-        v-for="c in categories"
-        :key="c.value"
-        :class="{ active: c.value === activeCategory }"
-        @click="setCategory(c.value)"
-      >
-        {{ c.label }}
-      </button>
-    </div>
-
-    <!-- 搜索历史 -->
-    <div v-if="history.length" class="history">
-      <span class="history-label">历史记录：</span>
-      <button
-        v-for="h in history"
-        :key="h"
-        class="history-item"
-        @click="selectHistory(h)"
-      >
-        {{ h }}
-      </button>
-      <button class="history-clear" @click="clearHistory">清空</button>
-    </div>
-
-    <!-- 错误提示 -->
-    <p v-if="errorMsg" class="error">{{ errorMsg }}</p>
 
     <!-- 主体区域：左地图 + 右列表 -->
     <main class="main">
@@ -79,33 +80,43 @@
 <script>
 export default {
   name: 'App',
+
   data() {
     return {
-      keyword: '', // 搜索关键字
-      lng: 121.6, // 初始经度
-      lat: 38.9,  // 初始纬度
-      radius: 2000, // 搜索半径
-      loading: false, // 加载状态
-      errorMsg: '', // 错误消息
-      map: null, // 地图实例
-      markers: [], // 地图标记
-      pois: [], // 搜索结果
-      history: [], // 搜索历史
-      maxHistory: 5, // 最大历史记录数
+      // 搜索相关
+      keyword: '',
+      lng: 121.6, // 可在 mounted 里改成当前位置
+      lat: 38.9,
+      radius: 2000,
+      loading: false,
+      errorMsg: '',
+
+      // 地图相关
+      map: null,
+      markers: [],
+
+      // 搜索结果 & 历史
+      pois: [],
+      history: [],
+      maxHistory: 5,
+
+      // 分类快捷
       categories: [
         { label: '超市', value: '超市' },
         { label: '餐饮', value: '餐饮' },
         { label: '医院', value: '医院' },
         { label: '公交站', value: '公交站' }
-      ], // 分类快捷按钮
-      activeCategory: '', // 当前选中的分类
+      ],
+      activeCategory: ''
     };
   },
+
   mounted() {
     this.loadHistory();
     this.initMap();
     this.locateUser();
   },
+
   methods: {
     /** 初始化高德地图 */
     initMap() {
@@ -287,5 +298,164 @@ export default {
 </script>
 
 <style scoped>
-/* 样式部分保持不变，可根据需求继续调整 */
+.app {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
+    Arial, 'Noto Sans', sans-serif;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  padding: 12px 16px;
+  border-bottom: 1px solid #eee;
+}
+
+.header h1 {
+  margin: 0 0 8px;
+  font-size: 20px;
+}
+
+.search-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.search-bar input {
+  flex: 1;
+  padding: 6px 8px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+}
+
+.search-bar button {
+  padding: 6px 14px;
+  border-radius: 4px;
+  border: none;
+  background-color: #42b983;
+  color: #fff;
+  cursor: pointer;
+}
+
+.search-bar button:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.categories button {
+  padding: 4px 10px;
+  border-radius: 16px;
+  border: 1px solid #42b983;
+  background: #fff;
+  color: #42b983;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.categories button.active {
+  background: #42b983;
+  color: #fff;
+}
+
+.history {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.history-label {
+  color: #666;
+}
+
+.history-item {
+  border: none;
+  background: #f0f0f0;
+  border-radius: 12px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.history-clear {
+  border: none;
+  background: transparent;
+  color: #999;
+  cursor: pointer;
+}
+
+.error {
+  color: #e74c3c;
+  margin-top: 4px;
+}
+
+.main {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+/* 左地图 */
+.map-wrapper {
+  flex: 2;
+}
+
+.map {
+  width: 100%;
+  height: 100%;
+}
+
+/* 右列表 */
+.list-wrapper {
+  flex: 1;
+  border-left: 1px solid #eee;
+  padding: 8px;
+  overflow-y: auto;
+}
+
+.list-wrapper h2 {
+  margin-top: 0;
+  font-size: 16px;
+}
+
+.poi-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.poi-item {
+  padding: 8px 4px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+}
+
+.poi-item:hover {
+  background: #f9f9f9;
+}
+
+.poi-name {
+  font-weight: bold;
+  margin-bottom: 2px;
+}
+
+.poi-address {
+  font-size: 12px;
+  color: #666;
+}
+
+.poi-meta {
+  font-size: 12px;
+  color: #999;
+  display: flex;
+  justify-content: space-between;
+}
 </style>
