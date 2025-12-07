@@ -289,7 +289,6 @@ export default {
 };
 </script>
 
-
 <style scoped>
 .app {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
