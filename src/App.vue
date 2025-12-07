@@ -109,9 +109,12 @@ export default {
     };
   },
   mounted() {
-    this.loadHistory();
+    this.loadHistory(); 
     this.initMap();
     this.locateUser();
+    
+    // 确保 clearMarkers 方法在 mounted 时绑定到当前 Vue 实例
+    this.clearMarkers = this.clearMarkers.bind(this); // 绑定 this 上下文
   },
   methods: {
     /** 初始化高德地图 */
@@ -293,7 +296,6 @@ export default {
   }
 };
 </script>
-
 
 <style scoped>
 .app {
