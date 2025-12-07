@@ -143,7 +143,12 @@ export default {
           this.lng = pos.coords.longitude;
           this.lat = pos.coords.latitude;
           if (this.map) {
-            this.map.setCenter([this.lng, this.lat]);
+            this.map.setCenter([this.lng, this.lat]); // 更新地图中心
+            new window.AMap.Marker({
+              position: [this.lng, this.lat],
+              title: '当前位置',
+              map: this.map
+            });
           }
         },
         (err) => {
@@ -201,7 +206,7 @@ export default {
         if (result.status !== 1) {
           this.errorMsg = result.info || '搜索失败，请稍后重试';
           this.pois = [];
-          this.clearMarkers();
+          this.clearMarkers(); // 清除旧标记
           return;
         }
 
@@ -222,7 +227,7 @@ export default {
     showMarkers(pois) {
       if (!this.map || !Array.isArray(pois)) return;  // 确保 pois 是数组
 
-      this.clearMarkers();
+      this.clearMarkers(); // 清除之前的标记
 
       const bounds = new window.AMap.Bounds();
 
@@ -237,12 +242,12 @@ export default {
           map: this.map
         });
 
-        this.markers.push(marker);
-        bounds.extend([lng, lat]);
+        this.markers.push(marker); // 添加新标记
+        bounds.extend([lng, lat]); // 扩展视野框以适应所有标记
       });
 
       if (this.markers.length) {
-        this.map.setFitView(this.markers);
+        this.map.setFitView(this.markers); // 更新地图视图
       }
     },
 
@@ -288,6 +293,7 @@ export default {
   }
 };
 </script>
+
 
 <style scoped>
 .app {
