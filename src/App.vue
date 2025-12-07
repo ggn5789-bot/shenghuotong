@@ -67,6 +67,7 @@
             <div class="poi-address">{{ poi.address || '地址未知' }}</div>
             <div class="poi-meta">
               <span>距离：{{ poi.distance }} m</span>
+              <span v-if="poi.rating">评分：{{ poi.rating }}</span>
               <span v-if="poi.location">坐标：{{ poi.location }}</span>
             </div>
           </li>
@@ -117,6 +118,13 @@ export default {
       this.map = new window.AMap.Map('map', {
         zoom: 14,
         center: [this.lng, this.lat]
+      });
+
+      // 标记当前位置
+      new window.AMap.Marker({
+        position: [this.lng, this.lat],
+        title: '当前位置',
+        map: this.map
       });
     },
 
