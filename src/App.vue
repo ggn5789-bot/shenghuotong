@@ -28,6 +28,11 @@
       </button>
     </div>
 
+    <!-- 生活服务推荐按钮 -->
+    <div class="recommendation">
+      <button @click="getNearbyServices">生活服务推荐</button>
+    </div>
+
     <!-- 搜索历史 -->
     <div v-if="history.length" class="history">
       <span class="history-label">历史记录：</span>
@@ -68,7 +73,8 @@
             <div class="poi-meta">
               <span>距离：{{ poi.distance }} m</span>
               <span v-if="poi.rating">评分：{{ poi.rating }}</span>
-              <span v-if="poi.location">坐标：{{ poi.location }}</span>
+              <span v-if="poi.tel">电话：{{ poi.tel }}</span>
+              <span v-if="poi.business_area">商圈：{{ poi.business_area }}</span>
             </div>
           </li>
         </ul>
@@ -178,13 +184,12 @@ export default {
       localStorage.removeItem('shengtong_history');
     },
 
-    /** 调用后端 /api/search */
-    async searchPOI() {
+    /** 调用后端 /api/search 获取附近的服务 */
+    async getNearbyServices() {
       this.loading = true;
 
       try {
         const params = new URLSearchParams({
-          keywords: this.keyword,
           lng: this.lng,
           lat: this.lat,
           radius: this.radius
@@ -203,9 +208,6 @@ export default {
         this.pois = Array.isArray(result.data) ? result.data : [];
         this.errorMsg = '';
 
-        // 保存历史记录
-        this.saveHistory(this.keyword);
-
         // 更新地图标记
         this.showMarkers(this.pois);
       } catch (err) {
@@ -214,13 +216,6 @@ export default {
       } finally {
         this.loading = false;
       }
-    },
-
-    /** 清除旧的 Marker */
-    clearMarkers() {
-      if (!this.markers || !this.markers.length) return;
-      this.markers.forEach((m) => m.setMap(null));
-      this.markers = [];
     },
 
     /** 在地图上展示 marker */
@@ -293,6 +288,7 @@ export default {
   }
 };
 </script>
+
 
 <style scoped>
 .app {
