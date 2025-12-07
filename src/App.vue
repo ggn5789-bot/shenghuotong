@@ -192,7 +192,7 @@ export default {
           return;
         }
 
-        this.pois = result.data || [];
+        this.pois = Array.isArray(result.data) ? result.data : [];
         this.errorMsg = '';
 
         // 保存历史记录
@@ -217,7 +217,7 @@ export default {
 
     /** 在地图上展示 marker */
     showMarkers(pois) {
-      if (!this.map) return;
+      if (!this.map || !Array.isArray(pois)) return;  // 确保 pois 是数组
 
       this.clearMarkers();
 
