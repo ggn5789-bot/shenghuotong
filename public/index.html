@@ -1,19 +1,25 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-  <head>
+<head>
     <meta charset="utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta
-      name="viewport"
-      content="width=device-width,initial-scale=1.0"
+        name="viewport"
+        content="width=device-width,initial-scale=1.0"
     />
     <link rel="icon" href="<%= BASE_URL %>favicon.ico" />
     <title><%= htmlWebpackPlugin.options.title %></title>
+    
+    <script type="text/javascript">
+      window._AMapSecurityConfig = {
+        securityJsCode: 50d200b81e263a5c1b7342ca31155fb2, 
+      }
+    </script>
+    
     <script
-      src="https://webapi.amap.com/maps?v=2.0&key=b71bb4c21ad218983a89814965c47f39"
+        src="https://webapi.amap.com/maps?v=2.0&key=b71bb4c21ad218983a89814965c47f39"
     ></script>
-  </head>
-
+</head>
   <body>
     <noscript>
       <strong>
