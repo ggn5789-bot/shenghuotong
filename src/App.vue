@@ -88,7 +88,7 @@ export default {
       errorMsg: '',
       map: null,
       markers: [],
-      userMarker: null, // ✨ 新增：存储用户位置标记实例
+      userMarker: null, // 存储用户位置标记实例
       pois: [],
       history: [],
       maxHistory: 5,
@@ -109,24 +109,23 @@ export default {
   methods: {
     /** 初始化高德地图 */
     initMap() {
-      // 检查 window.AMap 是否存在 (必须在 index.html 引入 SDK)
       if (!window.AMap) {
         this.errorMsg = '高德地图 SDK 未加载，请检查 index.html 配置';
         return;
       }
 
+      // 创建地图实例
       this.map = new window.AMap.Map('map', {
         zoom: 13,
         center: [this.lng, this.lat],
         viewMode: '2D'
       });
 
-      // ✨ 优化：创建并存储用户位置标记，使用更明显的样式
-      this.userMarker = new window.AMap.Marker({ 
+      // 创建并存储用户位置标记，使用更明显的样式
+      this.userMarker = new window.AMap.Marker({
         position: [this.lng, this.lat],
         title: '我的位置',
-        // 使用一个略微更明显的蓝色圆点
-        content: '<div style="background:#409EFF;width:12px;height:12px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 5px rgba(0, 0, 0, 0.3);"></div>', 
+        content: '<div style="background:#409EFF;width:12px;height:12px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 5px rgba(0, 0, 0, 0.3);"></div>',
         anchor: 'center',
         map: this.map
       });
@@ -145,7 +144,7 @@ export default {
           if (this.map) {
             this.map.setCenter(newCenter);
             
-            // ✨ 关键修改：更新用户位置的 marker
+            // 更新用户位置的 marker
             if (this.userMarker) {
               this.userMarker.setPosition(newCenter);
             }
@@ -405,7 +404,6 @@ export default {
   background: none;
   color: #999;
   cursor: pointer;
-}
 
 /* 错误信息 */
 .error {
