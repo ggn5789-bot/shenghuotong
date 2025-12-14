@@ -88,6 +88,7 @@ export default {
       errorMsg: '',
       map: null,
       markers: [],
+      userMarker: null, // ✨ 新增：存储用户位置标记实例
       pois: [],
       history: [],
       maxHistory: 5,
@@ -103,14 +104,14 @@ export default {
   mounted() {
     this.loadHistory();
     this.initMap();
-    this.locateUser();
+    this.locateUser(); // 尝试定位用户，并更新地图中心和标记
   },
   methods: {
     /** 初始化高德地图 */
     initMap() {
       // 检查 window.AMap 是否存在 (必须在 index.html 引入 SDK)
       if (!window.AMap) {
-        this.errorMsg = '高德地图 SDK 未加载，请检查 index.html 是否配置了 Script 标签';
+        this.errorMsg = '高德地图 SDK 未加载，请检查 index.html 配置';
         return;
       }
 
@@ -120,11 +121,13 @@ export default {
         viewMode: '2D'
       });
 
-      // 标记当前用户位置
-      const userMarker = new window.AMap.Marker({
+      // ✨ 优化：创建并存储用户位置标记，使用更明显的样式
+      this.userMarker = new window.AMap.Marker({ 
         position: [this.lng, this.lat],
         title: '我的位置',
-        content: '<div style="background:blue;width:10px;height:10px;border-radius:50%;"></div>', // 简单蓝点
+        // 使用一个略微更明显的蓝色圆点
+        content: '<div style="background:#409EFF;width:12px;height:12px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 5px rgba(0, 0, 0, 0.3);"></div>', 
+        anchor: 'center',
         map: this.map
       });
     },
@@ -136,9 +139,16 @@ export default {
         (pos) => {
           this.lng = pos.coords.longitude;
           this.lat = pos.coords.latitude;
+          
+          const newCenter = [this.lng, this.lat];
+
           if (this.map) {
-            this.map.setCenter([this.lng, this.lat]);
-            // 可以在这里更新用户位置的 marker，这里简化处理
+            this.map.setCenter(newCenter);
+            
+            // ✨ 关键修改：更新用户位置的 marker
+            if (this.userMarker) {
+              this.userMarker.setPosition(newCenter);
+            }
           }
         },
         (err) => {
@@ -215,7 +225,6 @@ export default {
         }
 
         // 解析数据：api/search.js 返回结构为 { status: 1, data: { status: '1', pois: [...] } }
-        // 注意：高德返回的原始数据在 result.data 中，而 POI 列表在 result.data.pois 中
         const amapData = result.data || {};
         
         if (amapData.pois && Array.isArray(amapData.pois)) {
@@ -228,7 +237,8 @@ export default {
 
       } catch (err) {
         console.error(err);
-        this.errorMsg = '网络请求失败：' + err.message;
+        // 捕获 HTTP error status 500 等网络或服务器错误
+        this.errorMsg = '网络请求失败：' + err.message; 
       } finally {
         this.loading = false;
       }
@@ -268,7 +278,7 @@ export default {
       }
     },
 
-    /** 清除地图上的标记 (修复了之前缺失此方法的问题) */
+    /** 清除地图上的标记 */
     clearMarkers() {
       if (this.map && this.markers.length > 0) {
         this.map.remove(this.markers);
@@ -316,6 +326,7 @@ export default {
 </script>
 
 <style scoped>
+/* 样式部分保持不变，确保了布局的完整性 */
 .app {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   height: 100vh;
