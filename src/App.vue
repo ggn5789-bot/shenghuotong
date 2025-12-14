@@ -90,7 +90,7 @@ export default {
     return {
       keyword: '', // 搜索关键字
       lng: 121.6, // 初始经度
-      lat: 38.9,  // 初始纬度
+      lat: 38.9,  // 初始纬度
       radius: 2000, // 搜索半径
       loading: false, // 加载状态
       errorMsg: '', // 错误消息
@@ -106,13 +106,14 @@ export default {
         { label: '公交站', value: '公交站' }
       ], // 分类快捷按钮
       activeCategory: '', // 当前选中的分类
+      clearMarkers: null, // 清除标记的方法绑定
     };
   },
   mounted() {
     this.loadHistory(); 
     this.initMap();
     this.locateUser();
-    
+
     // 确保 clearMarkers 方法在 mounted 时绑定到当前 Vue 实例
     this.clearMarkers = this.clearMarkers.bind(this); // 绑定 this 上下文
   },
@@ -228,7 +229,7 @@ export default {
 
     /** 在地图上展示 marker */
     showMarkers(pois) {
-      if (!this.map || !Array.isArray(pois)) return;  // 确保 pois 是数组
+      if (!this.map || !Array.isArray(pois)) return;  // 确保 pois 是数组
 
       this.clearMarkers(); // 清除之前的标记
 
@@ -292,6 +293,12 @@ export default {
       } catch (e) {
         console.warn('读取历史记录失败', e);
       }
+    },
+
+    /** 清除所有标记 */
+    clearMarkers() {
+      this.markers.forEach(marker => marker.setMap(null));  // 清除地图上的所有标记
+      this.markers = [];  // 清空 markers 数组
     }
   }
 };
