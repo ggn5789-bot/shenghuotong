@@ -1,13 +1,12 @@
 <template>
   <div class="app">
-    <!-- 顶部搜索栏 -->
     <header class="header">
       <h1>生活通 · 附近生活服务查询</h1>
       <div class="search-bar">
         <input
           v-model.trim="keyword"
           type="text"
-          placeholder="请输入搜索关键字"
+          placeholder="请输入搜索关键字 (如: 美食)"
           @keyup.enter="handleSearch"
         />
         <button @click="handleSearch" :disabled="loading">
@@ -16,7 +15,6 @@
       </div>
     </header>
 
-    <!-- 分类快捷按钮 -->
     <div class="categories">
       <button
         v-for="c in categories"
@@ -28,12 +26,10 @@
       </button>
     </div>
 
-    <!-- 生活服务推荐按钮 -->
     <div class="recommendation">
-      <button @click="getNearbyServices">生活服务推荐</button>
+      <button @click="handleRecommend">生活服务推荐</button>
     </div>
 
-    <!-- 搜索历史 -->
     <div v-if="history.length" class="history">
       <span class="history-label">历史记录：</span>
       <button
@@ -47,10 +43,8 @@
       <button class="history-clear" @click="clearHistory">清空</button>
     </div>
 
-    <!-- 错误提示 -->
     <p v-if="errorMsg" class="error">{{ errorMsg }}</p>
 
-    <!-- 主体区域：左地图 + 右列表 -->
     <main class="main">
       <section class="map-wrapper">
         <div id="map" class="map"></div>
@@ -59,12 +53,12 @@
       <section class="list-wrapper">
         <h2>搜索结果</h2>
         <p v-if="loading">正在搜索中，请稍候...</p>
-        <p v-else-if="pois.length === 0">暂时没有结果，请尝试其他关键字。</p>
+        <p v-else-if="pois.length === 0">暂时没有结果，请尝试其他关键字或移动地图位置。</p>
 
         <ul v-else class="poi-list">
           <li
             v-for="poi in pois"
-            :key="poi.name + poi.location"
+            :key="poi.id"
             class="poi-item"
             @click="focusPOI(poi)"
           >
@@ -72,9 +66,7 @@
             <div class="poi-address">{{ poi.address || '地址未知' }}</div>
             <div class="poi-meta">
               <span>距离：{{ poi.distance }} m</span>
-              <span v-if="poi.rating">评分：{{ poi.rating }}</span>
-              <span v-if="poi.tel">电话：{{ poi.tel }}</span>
-              <span v-if="poi.business_area">商圈：{{ poi.business_area }}</span>
+              <span v-if="poi.tel && typeof poi.tel === 'string'">电话：{{ poi.tel.split(';')[0] }}</span>
             </div>
           </li>
         </ul>
@@ -88,71 +80,65 @@ export default {
   name: 'App',
   data() {
     return {
-      keyword: '', // 搜索关键字
-      lng: 121.6, // 初始经度
-      lat: 38.9,  // 初始纬度
-      radius: 2000, // 搜索半径
-      loading: false, // 加载状态
-      errorMsg: '', // 错误消息
-      map: null, // 地图实例
-      markers: [], // 地图标记
-      pois: [], // 搜索结果
-      history: [], // 搜索历史
-      maxHistory: 5, // 最大历史记录数
+      keyword: '', // 输入框的值
+      lng: 121.6, // 初始经度 (大连)
+      lat: 38.9,  // 初始纬度
+      radius: 3000, // 搜索半径
+      loading: false,
+      errorMsg: '',
+      map: null,
+      markers: [],
+      pois: [],
+      history: [],
+      maxHistory: 5,
       categories: [
         { label: '超市', value: '超市' },
         { label: '餐饮', value: '餐饮' },
         { label: '医院', value: '医院' },
         { label: '公交站', value: '公交站' }
-      ], // 分类快捷按钮
-      activeCategory: '', // 当前选中的分类
-      clearMarkers: null, // 清除标记的方法绑定
+      ],
+      activeCategory: '',
     };
   },
   mounted() {
-    this.loadHistory(); 
+    this.loadHistory();
     this.initMap();
     this.locateUser();
-
-    // 确保 clearMarkers 方法在 mounted 时绑定到当前 Vue 实例
-    this.clearMarkers = this.clearMarkers.bind(this); // 绑定 this 上下文
   },
   methods: {
     /** 初始化高德地图 */
     initMap() {
+      // 检查 window.AMap 是否存在 (必须在 index.html 引入 SDK)
       if (!window.AMap) {
-        this.errorMsg = '高德地图 SDK 加载失败，请检查 index.html 中的 script 引用';
+        this.errorMsg = '高德地图 SDK 未加载，请检查 index.html 是否配置了 Script 标签';
         return;
       }
 
       this.map = new window.AMap.Map('map', {
-        zoom: 14,
-        center: [this.lng, this.lat]
+        zoom: 13,
+        center: [this.lng, this.lat],
+        viewMode: '2D'
       });
 
-      // 标记当前位置
-      new window.AMap.Marker({
+      // 标记当前用户位置
+      const userMarker = new window.AMap.Marker({
         position: [this.lng, this.lat],
-        title: '当前位置',
+        title: '我的位置',
+        content: '<div style="background:blue;width:10px;height:10px;border-radius:50%;"></div>', // 简单蓝点
         map: this.map
       });
     },
 
-    /** 尝试浏览器定位，更新中心点 */
+    /** 浏览器定位 */
     locateUser() {
       if (!navigator.geolocation) return;
-
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           this.lng = pos.coords.longitude;
           this.lat = pos.coords.latitude;
           if (this.map) {
-            this.map.setCenter([this.lng, this.lat]); // 更新地图中心
-            new window.AMap.Marker({
-              position: [this.lng, this.lat],
-              title: '当前位置',
-              map: this.map
-            });
+            this.map.setCenter([this.lng, this.lat]);
+            // 可以在这里更新用户位置的 marker，这里简化处理
           }
         },
         (err) => {
@@ -161,29 +147,32 @@ export default {
       );
     },
 
-    /** 点击搜索按钮或回车 */
+    /** 搜索入口 */
     handleSearch() {
       if (!this.keyword) {
         this.errorMsg = '请输入搜索关键字';
         return;
       }
-      this.errorMsg = '';
-      this.activeCategory = '';
+      this.activeCategory = ''; // 清除分类高亮
+      this.searchPOI(); // 调用实际搜索方法
+    },
+
+    /** 点击“生活服务推荐” */
+    handleRecommend() {
+      this.keyword = '生活服务';
       this.searchPOI();
     },
 
-    /** 设置分类关键字并搜索 */
+    /** 点击分类 */
     setCategory(category) {
       this.keyword = category;
       this.activeCategory = category;
-      this.errorMsg = '';
       this.searchPOI();
     },
 
-    /** 选择历史记录 */
+    /** 点击历史记录 */
     selectHistory(kw) {
       this.keyword = kw;
-      this.errorMsg = '';
       this.searchPOI();
     },
 
@@ -193,112 +182,134 @@ export default {
       localStorage.removeItem('shengtong_history');
     },
 
-    /** 调用后端 /api/search 获取附近的服务 */
-    async getNearbyServices() {
+    /** 核心：调用后端 API */
+    async searchPOI() {
       this.loading = true;
+      this.errorMsg = '';
+      this.saveHistory(this.keyword);
 
       try {
+        // 构造参数，注意这里 key 必须叫 'keywords' 以匹配 api/search.js
         const params = new URLSearchParams({
           lng: this.lng,
           lat: this.lat,
-          radius: this.radius
+          radius: this.radius,
+          keywords: this.keyword
         });
 
+        // 发送请求到 Vercel Serverless Function
         const resp = await fetch(`/api/search?${params.toString()}`);
+        
+        if (!resp.ok) {
+           throw new Error(`HTTP error! status: ${resp.status}`);
+        }
+
         const result = await resp.json();
 
+        // 检查后端自定义状态码
         if (result.status !== 1) {
-          this.errorMsg = result.info || '搜索失败，请稍后重试';
+          this.errorMsg = result.info || '搜索服务出错';
           this.pois = [];
-          this.clearMarkers(); // 清除旧标记
+          this.clearMarkers();
           return;
         }
 
-        this.pois = Array.isArray(result.data) ? result.data : [];
-        this.errorMsg = '';
+        // 解析数据：api/search.js 返回结构为 { status: 1, data: { status: '1', pois: [...] } }
+        // 注意：高德返回的原始数据在 result.data 中，而 POI 列表在 result.data.pois 中
+        const amapData = result.data || {};
+        
+        if (amapData.pois && Array.isArray(amapData.pois)) {
+          this.pois = amapData.pois;
+          this.showMarkers(this.pois);
+        } else {
+          this.pois = [];
+          this.clearMarkers();
+        }
 
-        // 更新地图标记
-        this.showMarkers(this.pois);
       } catch (err) {
         console.error(err);
-        this.errorMsg = '网络异常：' + err.message;
+        this.errorMsg = '网络请求失败：' + err.message;
       } finally {
         this.loading = false;
       }
     },
 
-    /** 在地图上展示 marker */
+    /** 在地图上显示标记 */
     showMarkers(pois) {
-      if (!this.map || !Array.isArray(pois)) return;  // 确保 pois 是数组
-
-      this.clearMarkers(); // 清除之前的标记
+      if (!this.map) return;
+      
+      this.clearMarkers(); // 清除旧标记
 
       const bounds = new window.AMap.Bounds();
-
+      
       pois.forEach((poi) => {
         if (!poi.location) return;
         const [lng, lat] = poi.location.split(',').map(Number);
-        if (Number.isNaN(lng) || Number.isNaN(lat)) return;
-
+        
         const marker = new window.AMap.Marker({
           position: [lng, lat],
           title: poi.name,
-          map: this.map
+          map: this.map,
+          extData: poi // 存入数据以便点击获取
         });
 
-        this.markers.push(marker); // 添加新标记
-        bounds.extend([lng, lat]); // 扩展视野框以适应所有标记
+        // 绑定点击事件
+        marker.on('click', () => {
+          this.focusPOI(poi);
+        });
+
+        this.markers.push(marker);
+        bounds.extend([lng, lat]);
       });
 
-      if (this.markers.length) {
-        this.map.setFitView(this.markers); // 更新地图视图
+      // 自动调整视野以包含所有标记
+      if (this.markers.length > 0) {
+        this.map.setFitView(this.markers);
       }
     },
 
-    /** 列表点击，地图居中放大 */
+    /** 清除地图上的标记 (修复了之前缺失此方法的问题) */
+    clearMarkers() {
+      if (this.map && this.markers.length > 0) {
+        this.map.remove(this.markers);
+        this.markers = [];
+      }
+    },
+
+    /** 列表/Marker 点击高亮 */
     focusPOI(poi) {
       if (!poi.location || !this.map) return;
       const [lng, lat] = poi.location.split(',').map(Number);
-      if (Number.isNaN(lng) || Number.isNaN(lat)) return;
-
-      this.map.setZoom(17);
-      this.map.setCenter([lng, lat]);
+      
+      this.map.setZoomAndCenter(17, [lng, lat]);
+      
+      // 可以添加信息窗体 (InfoWindow)
+      const infoWindow = new window.AMap.InfoWindow({
+        content: `<div style="padding:5px;"><b>${poi.name}</b><br/>${poi.address}</div>`,
+        offset: new window.AMap.Pixel(0, -30)
+      });
+      infoWindow.open(this.map, [lng, lat]);
     },
 
-    /** 保存搜索历史 */
-    saveHistory(keyword) {
-      const kw = keyword.trim();
-      if (!kw) return;
-
-      const existsIndex = this.history.indexOf(kw);
-      if (existsIndex !== -1) {
-        // 存在就提前
-        this.history.splice(existsIndex, 1);
-      }
-      this.history.unshift(kw);
-      if (this.history.length > this.maxHistory) {
-        this.history = this.history.slice(0, this.maxHistory);
-      }
-
+    /** 历史记录管理 */
+    saveHistory(val) {
+      if (!val) return;
+      const idx = this.history.indexOf(val);
+      if (idx !== -1) this.history.splice(idx, 1);
+      this.history.unshift(val);
+      if (this.history.length > this.maxHistory) this.history.pop();
       localStorage.setItem('shengtong_history', JSON.stringify(this.history));
     },
 
-    /** 加载历史 */
     loadHistory() {
-      try {
-        const raw = localStorage.getItem('shengtong_history');
-        if (raw) {
+      const raw = localStorage.getItem('shengtong_history');
+      if (raw) {
+        try {
           this.history = JSON.parse(raw);
+        } catch (e) {
+          console.error(e);
         }
-      } catch (e) {
-        console.warn('读取历史记录失败', e);
       }
-    },
-
-    /** 清除所有标记 */
-    clearMarkers() {
-      this.markers.forEach(marker => marker.setMap(null));  // 清除地图上的所有标记
-      this.markers = [];  // 清空 markers 数组
     }
   }
 };
@@ -306,164 +317,145 @@ export default {
 
 <style scoped>
 .app {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
-    Arial, 'Noto Sans', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   height: 100vh;
   display: flex;
   flex-direction: column;
 }
 
+/* 顶部样式 */
 .header {
   padding: 12px 16px;
   border-bottom: 1px solid #eee;
+  background: #fff;
 }
-
 .header h1 {
-  margin: 0 0 8px;
-  font-size: 20px;
+  margin: 0 0 10px;
+  font-size: 18px;
+  color: #333;
 }
-
 .search-bar {
   display: flex;
   gap: 8px;
-  margin-bottom: 8px;
 }
-
 .search-bar input {
   flex: 1;
-  padding: 6px 8px;
-  border-radius: 4px;
+  padding: 8px;
   border: 1px solid #ccc;
-}
-
-.search-bar button {
-  padding: 6px 14px;
   border-radius: 4px;
-  border: none;
+}
+.search-bar button {
+  padding: 8px 16px;
   background-color: #42b983;
-  color: #fff;
+  color: white;
+  border: none;
+  border-radius: 4px;
   cursor: pointer;
 }
-
 .search-bar button:disabled {
-  opacity: 0.7;
-  cursor: default;
+  background-color: #a0dcb6;
 }
 
-.categories {
+/* 分类与历史 */
+.categories, .recommendation, .history {
+  padding: 8px 16px;
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 6px;
+  gap: 8px;
 }
-
-.categories button {
-  padding: 4px 10px;
-  border-radius: 16px;
+.categories button, .recommendation button {
+  padding: 4px 12px;
   border: 1px solid #42b983;
-  background: #fff;
+  background: white;
   color: #42b983;
+  border-radius: 14px;
+  font-size: 13px;
   cursor: pointer;
-  font-size: 12px;
 }
-
 .categories button.active {
   background: #42b983;
-  color: #fff;
+  color: white;
 }
-
 .history {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
   font-size: 12px;
-}
-
-.history-label {
   color: #666;
+  border-bottom: 1px solid #f0f0f0;
 }
-
 .history-item {
+  background: #f5f5f5;
   border: none;
-  background: #f0f0f0;
-  border-radius: 12px;
+  border-radius: 4px;
   padding: 2px 8px;
   cursor: pointer;
 }
-
 .history-clear {
+  margin-left: auto;
   border: none;
-  background: transparent;
+  background: none;
   color: #999;
   cursor: pointer;
 }
 
+/* 错误信息 */
 .error {
-  color: #e74c3c;
-  margin-top: 4px;
+  color: red;
+  padding: 0 16px;
+  font-size: 12px;
 }
 
+/* 主体布局 */
 .main {
   flex: 1;
   display: flex;
-  min-height: 0;
+  overflow: hidden; /* 防止双滚动条 */
 }
 
-/* 左地图 */
+/* 地图 */
 .map-wrapper {
   flex: 2;
+  position: relative;
 }
-
 .map {
   width: 100%;
   height: 100%;
 }
 
-/* 右列表 */
+/* 列表 */
 .list-wrapper {
   flex: 1;
-  border-left: 1px solid #eee;
-  padding: 8px;
+  min-width: 300px;
+  border-left: 1px solid #ddd;
   overflow-y: auto;
+  padding: 10px;
+  background: #fff;
 }
-
-.list-wrapper h2 {
-  margin-top: 0;
-  font-size: 16px;
-}
-
 .poi-list {
   list-style: none;
-  margin: 0;
   padding: 0;
+  margin: 0;
 }
-
 .poi-item {
-  padding: 8px 4px;
-  border-bottom: 1px solid #f0f0f0;
+  padding: 10px;
+  border-bottom: 1px solid #eee;
   cursor: pointer;
 }
-
 .poi-item:hover {
-  background: #f9f9f9;
+  background-color: #f9f9f9;
 }
-
 .poi-name {
   font-weight: bold;
-  margin-bottom: 2px;
+  font-size: 15px;
+  margin-bottom: 4px;
 }
-
 .poi-address {
   font-size: 12px;
   color: #666;
+  margin-bottom: 4px;
 }
-
 .poi-meta {
-  font-size: 12px;
-  color: #999;
   display: flex;
   justify-content: space-between;
+  font-size: 12px;
+  color: #999;
 }
 </style>
-
