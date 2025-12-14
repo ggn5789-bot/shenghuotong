@@ -404,6 +404,7 @@ export default {
   background: none;
   color: #999;
   cursor: pointer;
+}
 
 /* 错误信息 */
 .error {
