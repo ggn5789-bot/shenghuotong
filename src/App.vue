@@ -80,15 +80,15 @@ export default {
   name: 'App',
   data() {
     return {
-      keyword: '', // 输入框的值
-      lng: 121.6, // 初始经度 (大连)
-      lat: 38.9,  // 初始纬度
-      radius: 3000, // 搜索半径
+      keyword: '',
+      lng: 121.593478, // 使用一个更精确的大连坐标
+      lat: 38.94871,
+      radius: 3000,
       loading: false,
       errorMsg: '',
       map: null,
       markers: [],
-      userMarker: null, // 存储用户位置标记实例
+      userMarker: null,
       pois: [],
       history: [],
       maxHistory: 5,
@@ -103,31 +103,48 @@ export default {
   },
   mounted() {
     this.loadHistory();
-    this.initMap();
-    this.locateUser(); // 尝试定位用户，并更新地图中心和标记
+    // 延迟一点加载地图，确保容器已渲染
+    setTimeout(() => {
+        this.initMap();
+        this.locateUser();
+    }, 100);
   },
   methods: {
     /** 初始化高德地图 */
     initMap() {
       if (!window.AMap) {
-        this.errorMsg = '高德地图 SDK 未加载，请检查 index.html 配置';
+        this.errorMsg = '高德地图 SDK 未加载，请检查网络或 Key 配置';
         return;
       }
 
-      // 创建地图实例
+      // 销毁旧地图实例（如果存在）
+      if (this.map) this.map.destroy();
+
+      // ✨ 关键修改：使用 3D 视图模式，这在 Vercel 等环境中渲染更稳定
       this.map = new window.AMap.Map('map', {
-        zoom: 13,
+        zoom: 14,
         center: [this.lng, this.lat],
-        viewMode: '2D'
+        viewMode: '3D',  // 修改为 3D
+        pitch: 0,        // 俯仰角 0，看起来像 2D
+        resizeEnable: true, // 允许自动适应容器大小
+        mapStyle: 'amap://styles/normal', // 强制指定标准样式
+        features: ['bg', 'road', 'building', 'point'] // 强制显示背景、道路、建筑
       });
 
-      // 创建并存储用户位置标记，使用更明显的样式
+      // 创建用户位置标记
       this.userMarker = new window.AMap.Marker({
         position: [this.lng, this.lat],
         title: '我的位置',
-        content: '<div style="background:#409EFF;width:12px;height:12px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 5px rgba(0, 0, 0, 0.3);"></div>',
+        content: '<div style="background:#409EFF;width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 5px rgba(0,0,0,0.5);"></div>',
         anchor: 'center',
-        map: this.map
+        map: this.map,
+        zIndex: 999 // 确保在最上层
+      });
+      
+      // 添加比例尺和缩放工具（可选，有助于调试地图是否活着）
+      window.AMap.plugin(['AMap.ToolBar', 'AMap.Scale'], () => {
+        this.map.addControl(new window.AMap.ToolBar());
+        this.map.addControl(new window.AMap.Scale());
       });
     },
 
@@ -138,67 +155,58 @@ export default {
         (pos) => {
           this.lng = pos.coords.longitude;
           this.lat = pos.coords.latitude;
-          
           const newCenter = [this.lng, this.lat];
 
           if (this.map) {
             this.map.setCenter(newCenter);
-            
-            // 更新用户位置的 marker
             if (this.userMarker) {
               this.userMarker.setPosition(newCenter);
             }
           }
         },
         (err) => {
-          console.warn('定位失败，使用默认坐标', err);
+          console.warn('定位失败/被拒绝，保持默认坐标', err);
+          // 不报错，静默失败，避免打扰用户
         }
       );
     },
 
-    /** 搜索入口 */
     handleSearch() {
       if (!this.keyword) {
         this.errorMsg = '请输入搜索关键字';
         return;
       }
-      this.activeCategory = ''; // 清除分类高亮
-      this.searchPOI(); // 调用实际搜索方法
+      this.activeCategory = ''; 
+      this.searchPOI(); 
     },
 
-    /** 点击“生活服务推荐” */
     handleRecommend() {
       this.keyword = '生活服务';
       this.searchPOI();
     },
 
-    /** 点击分类 */
     setCategory(category) {
       this.keyword = category;
       this.activeCategory = category;
       this.searchPOI();
     },
 
-    /** 点击历史记录 */
     selectHistory(kw) {
       this.keyword = kw;
       this.searchPOI();
     },
 
-    /** 清空历史 */
     clearHistory() {
       this.history = [];
       localStorage.removeItem('shengtong_history');
     },
 
-    /** 核心：调用后端 API */
     async searchPOI() {
       this.loading = true;
       this.errorMsg = '';
       this.saveHistory(this.keyword);
 
       try {
-        // 构造参数，注意这里 key 必须叫 'keywords' 以匹配 api/search.js
         const params = new URLSearchParams({
           lng: this.lng,
           lat: this.lat,
@@ -206,16 +214,12 @@ export default {
           keywords: this.keyword
         });
 
-        // 发送请求到 Vercel Serverless Function
+        // 调用后端
         const resp = await fetch(`/api/search?${params.toString()}`);
-        
-        if (!resp.ok) {
-           throw new Error(`HTTP error! status: ${resp.status}`);
-        }
+        if (!resp.ok) throw new Error(`Status: ${resp.status}`);
 
         const result = await resp.json();
 
-        // 检查后端自定义状态码
         if (result.status !== 1) {
           this.errorMsg = result.info || '搜索服务出错';
           this.pois = [];
@@ -223,9 +227,7 @@ export default {
           return;
         }
 
-        // 解析数据：api/search.js 返回结构为 { status: 1, data: { status: '1', pois: [...] } }
         const amapData = result.data || {};
-        
         if (amapData.pois && Array.isArray(amapData.pois)) {
           this.pois = amapData.pois;
           this.showMarkers(this.pois);
@@ -233,21 +235,17 @@ export default {
           this.pois = [];
           this.clearMarkers();
         }
-
       } catch (err) {
         console.error(err);
-        // 捕获 HTTP error status 500 等网络或服务器错误
-        this.errorMsg = '网络请求失败：' + err.message; 
+        this.errorMsg = '网络请求失败，请检查网络'; 
       } finally {
         this.loading = false;
       }
     },
 
-    /** 在地图上显示标记 */
     showMarkers(pois) {
       if (!this.map) return;
-      
-      this.clearMarkers(); // 清除旧标记
+      this.clearMarkers();
 
       const bounds = new window.AMap.Bounds();
       
@@ -259,10 +257,9 @@ export default {
           position: [lng, lat],
           title: poi.name,
           map: this.map,
-          extData: poi // 存入数据以便点击获取
+          extData: poi 
         });
 
-        // 绑定点击事件
         marker.on('click', () => {
           this.focusPOI(poi);
         });
@@ -271,13 +268,11 @@ export default {
         bounds.extend([lng, lat]);
       });
 
-      // 自动调整视野以包含所有标记
       if (this.markers.length > 0) {
         this.map.setFitView(this.markers);
       }
     },
 
-    /** 清除地图上的标记 */
     clearMarkers() {
       if (this.map && this.markers.length > 0) {
         this.map.remove(this.markers);
@@ -285,23 +280,21 @@ export default {
       }
     },
 
-    /** 列表/Marker 点击高亮 */
     focusPOI(poi) {
       if (!poi.location || !this.map) return;
       const [lng, lat] = poi.location.split(',').map(Number);
       
       this.map.setZoomAndCenter(17, [lng, lat]);
       
-      // 可以添加信息窗体 (InfoWindow)
       const infoWindow = new window.AMap.InfoWindow({
-        content: `<div style="padding:5px;"><b>${poi.name}</b><br/>${poi.address}</div>`,
+        content: `<div style="padding:5px;font-size:13px;"><b>${poi.name}</b><br/>${poi.address}</div>`,
         offset: new window.AMap.Pixel(0, -30)
       });
       infoWindow.open(this.map, [lng, lat]);
-    },
-
-    /** 历史记录管理 */
-    saveHistory(val) {
+    }
+    
+    // ... loadHistory 和 saveHistory 保持不变 ...
+    ,saveHistory(val) {
       if (!val) return;
       const idx = this.history.indexOf(val);
       if (idx !== -1) this.history.splice(idx, 1);
@@ -309,15 +302,10 @@ export default {
       if (this.history.length > this.maxHistory) this.history.pop();
       localStorage.setItem('shengtong_history', JSON.stringify(this.history));
     },
-
     loadHistory() {
       const raw = localStorage.getItem('shengtong_history');
       if (raw) {
-        try {
-          this.history = JSON.parse(raw);
-        } catch (e) {
-          console.error(e);
-        }
+        try { this.history = JSON.parse(raw); } catch (e) {}
       }
     }
   }
@@ -325,7 +313,17 @@ export default {
 </script>
 
 <style scoped>
-/* 样式部分保持不变，确保了布局的完整性 */
+/* 样式保持不变，但为了保险，请确认 map 的高度 */
+.map-wrapper {
+  flex: 2;
+  position: relative;
+  background: #f0f0f0; /* 添加一个背景色，防止地图加载慢时全白 */
+}
+.map {
+  width: 100%;
+  height: 100%;
+  min-height: 400px; /* 增加最小高度防止塌陷 */
+}
 .app {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   height: 100vh;
