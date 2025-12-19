@@ -97,7 +97,7 @@ export default {
       keyword: '',
       lng: 121.593478, 
       lat: 38.94871,
-      radius: 3000, // 默认半径
+      radius: 3000, 
       loading: false,
       errorMsg: '',
       map: null,
@@ -114,12 +114,11 @@ export default {
       ],
       activeCategory: '',
       
-      // ✨ 新增：推荐专栏配置
-      // value 中使用 | 符号代表“或”，高德会搜索其中任意一个关键词
+      // 推荐专栏数据
       recommendGroups: [
         { 
           label: '休闲娱乐', 
-          value: 'KTV|电影院|网吧|游乐园|棋牌室', 
+          value: 'KTV|网吧|健身房|运动馆|电影院', 
           icon: '🎮',
           radius: 2000 
         },
@@ -152,7 +151,6 @@ export default {
     }, 100);
   },
   methods: {
-    /** 初始化高德地图 */
     initMap() {
       if (!window.AMap) {
         this.errorMsg = '高德地图 SDK 未加载，请检查网络或 Key 配置';
@@ -185,7 +183,6 @@ export default {
       });
     },
 
-    /** 浏览器定位 */
     locateUser() {
       if (!navigator.geolocation) return;
       navigator.geolocation.getCurrentPosition(
@@ -207,40 +204,42 @@ export default {
       );
     },
 
-    /** 普通搜索入口 (默认3000米) */
+    /** 搜索按钮点击 */
     handleSearch() {
       if (!this.keyword) {
         this.errorMsg = '请输入搜索关键字';
         return;
       }
       this.activeCategory = ''; 
-      this.radius = 3000; // 重置为默认范围
+      this.radius = 3000; 
+      // 不传参，searchPOI 内部会自动使用 this.keyword
       this.searchPOI(); 
     },
 
-    /** 点击快捷分类 (默认3000米) */
+    /** 快捷分类点击 (这里通常还是会填充输入框，符合用户直觉) */
     setCategory(category) {
       this.keyword = category;
       this.activeCategory = category;
-      this.radius = 3000; // 重置为默认范围
+      this.radius = 3000; 
       this.searchPOI();
     },
 
-    /** ✨ 新增：处理专栏推荐搜索 (2000米) */
+    /** ✨ 重点修改：处理专栏推荐搜索 (不改变输入框) */
     handleSpecialRecommend(group) {
-      // 设置组合关键字 (例如: "超市|餐厅|奶茶店")
-      this.keyword = group.value;
-      // 清除快捷分类的高亮
-      this.activeCategory = '';
-      // 设置专栏特定的半径 (2000米)
+      // 1. 设置专栏特定半径
       this.radius = group.radius;
+      // 2. 清除快捷分类高亮
+      this.activeCategory = '';
       
-      this.searchPOI();
+      // 3. ✨ 关键：我们不修改 this.keyword (输入框内容)，而是直接把词传给搜索函数
+      // this.keyword = group.value; // <-- 这行已删除
+      
+      this.searchPOI(group.value);
     },
 
     selectHistory(kw) {
       this.keyword = kw;
-      this.radius = 3000; // 历史记录默认按3000搜
+      this.radius = 3000; 
       this.searchPOI();
     },
 
@@ -249,20 +248,34 @@ export default {
       localStorage.removeItem('shengtong_history');
     },
 
-    async searchPOI() {
+    /** ✨ 重点修改：搜索函数支持接收参数 */
+    // overrideKeywords: 如果传了这个参数，就用这个参数搜；否则搜输入框里的值
+    async searchPOI(overrideKeywords = null) {
+      // 确定实际要搜索的词
+      const actualKeywords = (typeof overrideKeywords === 'string' && overrideKeywords) 
+                             ? overrideKeywords 
+                             : this.keyword;
+
+      if (!actualKeywords) {
+          this.errorMsg = '请输入搜索关键字';
+          return;
+      }
+
       this.loading = true;
       this.errorMsg = '';
-      // 如果关键字太长（组合词），只存简略信息到历史，或者不存
-      if (this.keyword.indexOf('|') === -1) {
-         this.saveHistory(this.keyword);
+      
+      // 历史记录逻辑：只记录非组合词
+      // ✨ 必须检查 actualKeywords 是否包含 |
+      if (actualKeywords.indexOf('|') === -1) {
+         this.saveHistory(actualKeywords);
       }
 
       try {
         const params = new URLSearchParams({
           lng: this.lng,
           lat: this.lat,
-          radius: this.radius, // 使用当前的动态半径
-          keywords: this.keyword
+          radius: this.radius, 
+          keywords: actualKeywords // ✨ 使用计算出的 actualKeywords
         });
 
         const resp = await fetch(`/api/search?${params.toString()}`);
@@ -362,14 +375,13 @@ export default {
 </script>
 
 <style scoped>
+/* 样式保持不变 */
 .app {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   height: 100vh;
   display: flex;
   flex-direction: column;
 }
-
-/* 顶部样式 */
 .header {
   padding: 12px 16px;
   border-bottom: 1px solid #eee;
@@ -399,8 +411,6 @@ export default {
   cursor: pointer;
   white-space: nowrap;
 }
-
-/* 通用标签样式 */
 .section-label {
   font-size: 13px;
   font-weight: bold;
@@ -408,8 +418,6 @@ export default {
   margin-right: 8px;
   align-self: center;
 }
-
-/* 分类与推荐 */
 .categories, .recommendation-groups, .history {
   padding: 8px 16px;
   display: flex;
@@ -417,8 +425,6 @@ export default {
   gap: 8px;
   align-items: center;
 }
-
-/* 快捷分类按钮 */
 .categories button {
   padding: 4px 12px;
   border: 1px solid #ddd;
@@ -433,8 +439,6 @@ export default {
   color: white;
   border-color: #42b983;
 }
-
-/* ✨ 新增：推荐专栏样式 */
 .group-buttons {
   display: flex;
   gap: 8px;
@@ -443,7 +447,7 @@ export default {
 .rec-btn {
   padding: 6px 12px;
   border: none;
-  background: linear-gradient(135deg, #e3f2fd, #bbdefb); /* 浅蓝色渐变 */
+  background: linear-gradient(135deg, #e3f2fd, #bbdefb);
   color: #1565c0;
   border-radius: 8px;
   font-size: 13px;
@@ -458,11 +462,9 @@ export default {
   background: linear-gradient(135deg, #bbdefb, #90caf9);
   transform: translateY(-1px);
 }
-.rec-btn:nth-child(2) { background: linear-gradient(135deg, #fff3e0, #ffe0b2); color: #e65100; } /* 饮食-橙色 */
-.rec-btn:nth-child(3) { background: linear-gradient(135deg, #f3e5f5, #e1bee7); color: #6a1b9a; } /* 护理-紫色 */
-.rec-btn:nth-child(4) { background: linear-gradient(135deg, #e8f5e9, #c8e6c9); color: #2e7d32; } /* 医疗-绿色 */
-
-/* 历史记录 */
+.rec-btn:nth-child(2) { background: linear-gradient(135deg, #fff3e0, #ffe0b2); color: #e65100; }
+.rec-btn:nth-child(3) { background: linear-gradient(135deg, #f3e5f5, #e1bee7); color: #6a1b9a; }
+.rec-btn:nth-child(4) { background: linear-gradient(135deg, #e8f5e9, #c8e6c9); color: #2e7d32; }
 .history {
   font-size: 12px;
   color: #666;
@@ -482,21 +484,16 @@ export default {
   color: #999;
   cursor: pointer;
 }
-
 .error {
   color: red;
   padding: 0 16px;
   font-size: 12px;
 }
-
-/* 主体布局 */
 .main {
   flex: 1;
   display: flex;
   overflow: hidden;
 }
-
-/* 地图 */
 .map-wrapper {
   flex: 2;
   position: relative;
@@ -518,8 +515,6 @@ export default {
   box-shadow: 0 2px 4px rgba(0,0,0,0.2);
   z-index: 100;
 }
-
-/* 列表 */
 .list-wrapper {
   flex: 1;
   min-width: 300px;
