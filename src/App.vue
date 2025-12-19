@@ -16,6 +16,7 @@
     </header>
 
     <div class="categories">
+      <span class="section-label">快捷搜索：</span>
       <button
         v-for="c in categories"
         :key="c.value"
@@ -26,8 +27,19 @@
       </button>
     </div>
 
-    <div class="recommendation">
-      <button @click="handleRecommend">生活服务推荐</button>
+    <div class="recommendation-groups">
+      <span class="section-label">精选专栏 (2km内)：</span>
+      <div class="group-buttons">
+        <button 
+          v-for="group in recommendGroups" 
+          :key="group.label"
+          class="rec-btn"
+          @click="handleSpecialRecommend(group)"
+        >
+          <span class="rec-icon">{{ group.icon }}</span>
+          {{ group.label }}
+        </button>
+      </div>
     </div>
 
     <div v-if="history.length" class="history">
@@ -48,10 +60,11 @@
     <main class="main">
       <section class="map-wrapper">
         <div id="map" class="map"></div>
+        <div class="radius-tip">当前搜索范围: {{ radius }}米</div>
       </section>
 
       <section class="list-wrapper">
-        <h2>搜索结果</h2>
+        <h2>搜索结果 <span v-if="pois.length">({{ pois.length }})</span></h2>
         <p v-if="loading">正在搜索中，请稍候...</p>
         <p v-else-if="pois.length === 0">暂时没有结果，请尝试其他关键字或移动地图位置。</p>
 
@@ -68,6 +81,7 @@
               <span>距离：{{ poi.distance }} m</span>
               <span v-if="poi.tel && typeof poi.tel === 'string'">电话：{{ poi.tel.split(';')[0] }}</span>
             </div>
+            <div class="poi-type" v-if="poi.type">{{ poi.type.split(';')[0] }}</div>
           </li>
         </ul>
       </section>
@@ -81,9 +95,9 @@ export default {
   data() {
     return {
       keyword: '',
-      lng: 121.593478, // 使用一个更精确的大连坐标
+      lng: 121.593478, 
       lat: 38.94871,
-      radius: 3000,
+      radius: 3000, // 默认半径
       loading: false,
       errorMsg: '',
       map: null,
@@ -99,11 +113,39 @@ export default {
         { label: '公交站', value: '公交站' }
       ],
       activeCategory: '',
+      
+      // ✨ 新增：推荐专栏配置
+      // value 中使用 | 符号代表“或”，高德会搜索其中任意一个关键词
+      recommendGroups: [
+        { 
+          label: '休闲娱乐', 
+          value: 'KTV|电影院|网吧|游乐园|棋牌室', 
+          icon: '🎮',
+          radius: 2000 
+        },
+        { 
+          label: '饮食美食', 
+          value: '超市|餐厅|奶茶店|小吃|火锅', 
+          icon: '🍔',
+          radius: 2000 
+        },
+        { 
+          label: '个人护理', 
+          value: '理发店|洗浴中心|美容院|足疗按摩', 
+          icon: '💇',
+          radius: 2000 
+        },
+        { 
+          label: '医疗健康', 
+          value: '综合医院|药店|诊所|社区卫生服务中心', 
+          icon: '💊',
+          radius: 2000 
+        }
+      ]
     };
   },
   mounted() {
     this.loadHistory();
-    // 延迟一点加载地图，确保容器已渲染
     setTimeout(() => {
         this.initMap();
         this.locateUser();
@@ -116,32 +158,27 @@ export default {
         this.errorMsg = '高德地图 SDK 未加载，请检查网络或 Key 配置';
         return;
       }
-
-      // 销毁旧地图实例（如果存在）
       if (this.map) this.map.destroy();
 
-      // ✨ 关键修改：使用 3D 视图模式，这在 Vercel 等环境中渲染更稳定
       this.map = new window.AMap.Map('map', {
         zoom: 14,
         center: [this.lng, this.lat],
-        viewMode: '3D',  // 修改为 3D
-        pitch: 0,        // 俯仰角 0，看起来像 2D
-        resizeEnable: true, // 允许自动适应容器大小
-        mapStyle: 'amap://styles/normal', // 强制指定标准样式
-        features: ['bg', 'road', 'building', 'point'] // 强制显示背景、道路、建筑
+        viewMode: '3D', 
+        pitch: 0, 
+        resizeEnable: true, 
+        mapStyle: 'amap://styles/normal', 
+        features: ['bg', 'road', 'building', 'point'] 
       });
 
-      // 创建用户位置标记
       this.userMarker = new window.AMap.Marker({
         position: [this.lng, this.lat],
         title: '我的位置',
         content: '<div style="background:#409EFF;width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 5px rgba(0,0,0,0.5);"></div>',
         anchor: 'center',
         map: this.map,
-        zIndex: 999 // 确保在最上层
+        zIndex: 999 
       });
       
-      // 添加比例尺和缩放工具（可选，有助于调试地图是否活着）
       window.AMap.plugin(['AMap.ToolBar', 'AMap.Scale'], () => {
         this.map.addControl(new window.AMap.ToolBar());
         this.map.addControl(new window.AMap.Scale());
@@ -166,33 +203,44 @@ export default {
         },
         (err) => {
           console.warn('定位失败/被拒绝，保持默认坐标', err);
-          // 不报错，静默失败，避免打扰用户
         }
       );
     },
 
+    /** 普通搜索入口 (默认3000米) */
     handleSearch() {
       if (!this.keyword) {
         this.errorMsg = '请输入搜索关键字';
         return;
       }
       this.activeCategory = ''; 
+      this.radius = 3000; // 重置为默认范围
       this.searchPOI(); 
     },
 
-    handleRecommend() {
-      this.keyword = '生活服务';
-      this.searchPOI();
-    },
-
+    /** 点击快捷分类 (默认3000米) */
     setCategory(category) {
       this.keyword = category;
       this.activeCategory = category;
+      this.radius = 3000; // 重置为默认范围
+      this.searchPOI();
+    },
+
+    /** ✨ 新增：处理专栏推荐搜索 (2000米) */
+    handleSpecialRecommend(group) {
+      // 设置组合关键字 (例如: "超市|餐厅|奶茶店")
+      this.keyword = group.value;
+      // 清除快捷分类的高亮
+      this.activeCategory = '';
+      // 设置专栏特定的半径 (2000米)
+      this.radius = group.radius;
+      
       this.searchPOI();
     },
 
     selectHistory(kw) {
       this.keyword = kw;
+      this.radius = 3000; // 历史记录默认按3000搜
       this.searchPOI();
     },
 
@@ -204,17 +252,19 @@ export default {
     async searchPOI() {
       this.loading = true;
       this.errorMsg = '';
-      this.saveHistory(this.keyword);
+      // 如果关键字太长（组合词），只存简略信息到历史，或者不存
+      if (this.keyword.indexOf('|') === -1) {
+         this.saveHistory(this.keyword);
+      }
 
       try {
         const params = new URLSearchParams({
           lng: this.lng,
           lat: this.lat,
-          radius: this.radius,
+          radius: this.radius, // 使用当前的动态半径
           keywords: this.keyword
         });
 
-        // 调用后端
         const resp = await fetch(`/api/search?${params.toString()}`);
         if (!resp.ok) throw new Error(`Status: ${resp.status}`);
 
@@ -291,10 +341,9 @@ export default {
         offset: new window.AMap.Pixel(0, -30)
       });
       infoWindow.open(this.map, [lng, lat]);
-    }
+    },
     
-    // ... loadHistory 和 saveHistory 保持不变 ...
-    ,saveHistory(val) {
+    saveHistory(val) {
       if (!val) return;
       const idx = this.history.indexOf(val);
       if (idx !== -1) this.history.splice(idx, 1);
@@ -313,17 +362,6 @@ export default {
 </script>
 
 <style scoped>
-/* 样式保持不变，但为了保险，请确认 map 的高度 */
-.map-wrapper {
-  flex: 2;
-  position: relative;
-  background: #f0f0f0; /* 添加一个背景色，防止地图加载慢时全白 */
-}
-.map {
-  width: 100%;
-  height: 100%;
-  min-height: 400px; /* 增加最小高度防止塌陷 */
-}
 .app {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   height: 100vh;
@@ -359,23 +397,33 @@ export default {
   border: none;
   border-radius: 4px;
   cursor: pointer;
-}
-.search-bar button:disabled {
-  background-color: #a0dcb6;
+  white-space: nowrap;
 }
 
-/* 分类与历史 */
-.categories, .recommendation, .history {
+/* 通用标签样式 */
+.section-label {
+  font-size: 13px;
+  font-weight: bold;
+  color: #555;
+  margin-right: 8px;
+  align-self: center;
+}
+
+/* 分类与推荐 */
+.categories, .recommendation-groups, .history {
   padding: 8px 16px;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  align-items: center;
 }
-.categories button, .recommendation button {
+
+/* 快捷分类按钮 */
+.categories button {
   padding: 4px 12px;
-  border: 1px solid #42b983;
-  background: white;
-  color: #42b983;
+  border: 1px solid #ddd;
+  background: #f8f8f8;
+  color: #666;
   border-radius: 14px;
   font-size: 13px;
   cursor: pointer;
@@ -383,7 +431,38 @@ export default {
 .categories button.active {
   background: #42b983;
   color: white;
+  border-color: #42b983;
 }
+
+/* ✨ 新增：推荐专栏样式 */
+.group-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.rec-btn {
+  padding: 6px 12px;
+  border: none;
+  background: linear-gradient(135deg, #e3f2fd, #bbdefb); /* 浅蓝色渐变 */
+  color: #1565c0;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s;
+}
+.rec-btn:hover {
+  background: linear-gradient(135deg, #bbdefb, #90caf9);
+  transform: translateY(-1px);
+}
+.rec-btn:nth-child(2) { background: linear-gradient(135deg, #fff3e0, #ffe0b2); color: #e65100; } /* 饮食-橙色 */
+.rec-btn:nth-child(3) { background: linear-gradient(135deg, #f3e5f5, #e1bee7); color: #6a1b9a; } /* 护理-紫色 */
+.rec-btn:nth-child(4) { background: linear-gradient(135deg, #e8f5e9, #c8e6c9); color: #2e7d32; } /* 医疗-绿色 */
+
+/* 历史记录 */
 .history {
   font-size: 12px;
   color: #666;
@@ -404,7 +483,6 @@ export default {
   cursor: pointer;
 }
 
-/* 错误信息 */
 .error {
   color: red;
   padding: 0 16px;
@@ -415,17 +493,30 @@ export default {
 .main {
   flex: 1;
   display: flex;
-  overflow: hidden; /* 防止双滚动条 */
+  overflow: hidden;
 }
 
 /* 地图 */
 .map-wrapper {
   flex: 2;
   position: relative;
+  background: #f0f0f0;
 }
 .map {
   width: 100%;
   height: 100%;
+}
+.radius-tip {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #333;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  z-index: 100;
 }
 
 /* 列表 */
@@ -465,5 +556,10 @@ export default {
   justify-content: space-between;
   font-size: 12px;
   color: #999;
+}
+.poi-type {
+  font-size: 12px;
+  color: #409EFF;
+  margin-top: 4px;
 }
 </style>
