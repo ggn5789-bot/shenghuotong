@@ -212,11 +212,10 @@ export default {
       }
       this.activeCategory = ''; 
       this.radius = 3000; 
-      // 不传参，searchPOI 内部会自动使用 this.keyword
       this.searchPOI(); 
     },
 
-    /** 快捷分类点击 (这里通常还是会填充输入框，符合用户直觉) */
+    /** 快捷分类点击 */
     setCategory(category) {
       this.keyword = category;
       this.activeCategory = category;
@@ -224,16 +223,13 @@ export default {
       this.searchPOI();
     },
 
-    /** ✨ 重点修改：处理专栏推荐搜索 (不改变输入框) */
+    /** 处理专栏推荐搜索 (不改变输入框) */
     handleSpecialRecommend(group) {
       // 1. 设置专栏特定半径
       this.radius = group.radius;
       // 2. 清除快捷分类高亮
-      this.activeCategory = '';
-      
-      // 3. ✨ 关键：我们不修改 this.keyword (输入框内容)，而是直接把词传给搜索函数
-      // this.keyword = group.value; // <-- 这行已删除
-      
+      this.activeCategory = '';      
+      // 3. 直接把词传给搜索函数 
       this.searchPOI(group.value);
     },
 
@@ -248,7 +244,6 @@ export default {
       localStorage.removeItem('shengtong_history');
     },
 
-    /** ✨ 重点修改：搜索函数支持接收参数 */
     // overrideKeywords: 如果传了这个参数，就用这个参数搜；否则搜输入框里的值
     async searchPOI(overrideKeywords = null) {
       // 确定实际要搜索的词
@@ -265,7 +260,6 @@ export default {
       this.errorMsg = '';
       
       // 历史记录逻辑：只记录非组合词
-      // ✨ 必须检查 actualKeywords 是否包含 |
       if (actualKeywords.indexOf('|') === -1) {
          this.saveHistory(actualKeywords);
       }
