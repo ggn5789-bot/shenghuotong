@@ -34,7 +34,7 @@ module.exports = async (req, res) => {
     const data = await resp.json();
 
     if (data.status !== '1') {
-      // 高德返回错误，不要让函数直接崩溃，返回错误信息即可
+      // 返回错误信息
       return res.status(500).json({
         status: 0,
         info: data.info || '高德接口返回错误',
