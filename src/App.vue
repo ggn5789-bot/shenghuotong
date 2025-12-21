@@ -225,11 +225,8 @@ export default {
 
     /** 处理专栏推荐搜索 (不改变输入框) */
     handleSpecialRecommend(group) {
-      // 1. 设置专栏特定半径
       this.radius = group.radius;
-      // 2. 清除快捷分类高亮
       this.activeCategory = '';      
-      // 3. 直接把词传给搜索函数 
       this.searchPOI(group.value);
     },
 
@@ -244,9 +241,8 @@ export default {
       localStorage.removeItem('shengtong_history');
     },
 
-    // overrideKeywords: 如果传了这个参数，就用这个参数搜；否则搜输入框里的值
+    // 核心搜索函数
     async searchPOI(overrideKeywords = null) {
-      // 确定实际要搜索的词
       const actualKeywords = (typeof overrideKeywords === 'string' && overrideKeywords) 
                              ? overrideKeywords 
                              : this.keyword;
@@ -259,7 +255,6 @@ export default {
       this.loading = true;
       this.errorMsg = '';
       
-      // 历史记录逻辑：只记录非组合词
       if (actualKeywords.indexOf('|') === -1) {
          this.saveHistory(actualKeywords);
       }
@@ -269,10 +264,16 @@ export default {
           lng: this.lng,
           lat: this.lat,
           radius: this.radius, 
-          keywords: actualKeywords // ✨ 使用计算出的 actualKeywords
+          keywords: actualKeywords
         });
 
-        const resp = await fetch(`/api/search?${params.toString()}`);
+        // ============================================================
+        // 【关键修改】指向您的 Vercel 线上后端地址
+        // 如果您的后端项目名不是 shenghuotong，请修改这里的 URL
+        // ============================================================
+        const API_BASE = 'https://shenghuotong.vercel.app'; 
+        const resp = await fetch(`${API_BASE}/api/search?${params.toString()}`);
+        
         if (!resp.ok) throw new Error(`Status: ${resp.status}`);
 
         const result = await resp.json();
