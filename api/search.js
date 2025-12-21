@@ -1,57 +1,48 @@
-// my-vue-project/api/search.js
+// src/api/search.js
+const API_BASE_URL = 'https://shenghuotong.vercel.app';
 
-// Vercel Node.js Serverless Function
-module.exports = async (req, res) => {
+/**
+ * 向后端发起 POI 搜索请求
+ * @param {Object} params - 包含 { keywords, lng, lat, radius, category }
+ * @returns {Promise}
+ */
+export async function searchPOI(params) {
+  // 2. 构建查询参数
+  const queryParams = new URLSearchParams();
+  
+  // 必须参数
+  if (params.keywords) queryParams.append('keywords', params.keywords);
+  if (params.lng) queryParams.append('lng', params.lng);
+  if (params.lat) queryParams.append('lat', params.lat);
+  
+  // 可选参数
+  if (params.radius) queryParams.append('radius', params.radius);
+  if (params.category) queryParams.append('category', params.category);
+
+  const url = `${API_BASE_URL}/api/search?${queryParams.toString()}`;
+
   try {
-    const { keywords, lng, lat, radius = 2000, category } = req.query || {};
+    console.log('正在请求后端:', url); // 方便调试
 
-    if (!keywords || !lng || !lat) {
-      return res.status(400).json({
-        status: 0,
-        info: '缺少必要参数：keywords / lng / lat',
-      });
-    }
-
-    const location = `${lng},${lat}`;
-
-    const params = new URLSearchParams({
-      key: process.env.AMAP_KEY || '',
-      location,
-      keywords,
-      radius: String(radius),
-      output: 'JSON',
+    // 4. 发起 HTTP 请求
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      }
     });
 
-    if (category) {
-      params.set('types', category);
+    // 5. 检查网络状态
+    if (!response.ok) {
+      throw new Error(`网络请求失败，状态码: ${response.status}`);
     }
 
-    const url =
-      'https://restapi.amap.com/v3/place/around?' + params.toString();
+    // 6. 解析 JSON
+    const result = await response.json();
+    return result;
 
-    // Node 18+ 自带 fetch
-    const resp = await fetch(url);
-    const data = await resp.json();
-
-    if (data.status !== '1') {
-      // 返回错误信息
-      return res.status(500).json({
-        status: 0,
-        info: data.info || '高德接口返回错误',
-        raw: data,
-      });
-    }
-
-    // 一切正常
-    return res.status(200).json({
-      status: 1,
-      data,
-    });
-  } catch (err) {
-    console.error('API /api/search error:', err);
-    return res.status(500).json({
-      status: 0,
-      info: '服务器内部错误：' + err.message,
-    });
+  } catch (error) {
+    console.error('API 请求出错:', error);
+    throw error; // 继续抛出错误，让组件去处理显示
   }
-};
+}
