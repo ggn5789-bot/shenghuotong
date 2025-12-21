@@ -370,7 +370,6 @@ export default {
 </script>
 
 <style scoped>
-/* 样式保持不变 */
 .app {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   height: 100vh;
